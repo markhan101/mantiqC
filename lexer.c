@@ -46,6 +46,10 @@ enum States {
     B6,                 /* Sign after E */
     B7,                 /* Exponent digits */
 
+    /* --- String states --- */
+    ST_STR,             /* saw opening " — collecting string body */
+    ST_STR_ANY,         /* inside string, consuming chars */
+
     /* --- Operator lookahead states --- */
     OP_LT,              /* saw '<' */
     OP_GT,              /* saw '>' */
@@ -64,6 +68,7 @@ enum States {
     F_KW_CANDIDATE,     /* Letter-only word: check keyword table; error if not found */
     F_ID,               /* Identifier (underscore confirmed) */
     F_NUM,              /* Number (int / float / exp) */
+    F_STR,              /* String literal */
 
     /* Operators */
     F_LT,               /* <   */
@@ -134,6 +139,8 @@ enum Inputs {
     IN_MUL,     /* *  */
     IN_DIV,     /* /  */
 
+    IN_QUOTE,   /* "  — starts/ends a string literal */
+
     /* ---- delimiter: whitespace. advance() returns false for this ---- */
     IN_DELIM,   /* space / tab / newline — terminates a token, not consumed */
 
@@ -153,32 +160,22 @@ void initTT(void)
 
     /* ---------------------------------------------------------
        IDENTIFIERS & KEYWORDS
-       ---------------------------------------------------------
-       A1 : started with '_'       → must become F_ID
-       A2 : started with letter, no '_' yet → might be keyword
-       A3 : letter-start, '_' seen → must become F_ID
     --------------------------------------------------------- */
-
-    /* Path: starts with '_' */
     TT[S][IN_UND]   = A1;
     TT[A1][IN_LTR]  = A1;
-    TT[A1][IN_EXP]  = A1;   /* E/e is a letter inside identifiers */
+    TT[A1][IN_EXP]  = A1;
     TT[A1][IN_DIG]  = A1;
     TT[A1][IN_UND]  = A1;
-    TT[A1][IN_DELIM]= F_ID;  /* whitespace delimiter → accept as ID */
-    /* Also accept when we hit any operator/punctuation (they terminate the token
-       without being consumed — handled in the main loop via lookahead) */
+    TT[A1][IN_DELIM]= F_ID;
 
-    /* Path: starts with letter, no '_' yet */
     TT[S][IN_LTR]   = A2;
-    TT[S][IN_EXP]   = A2;   /* E/e can start a keyword too */
+    TT[S][IN_EXP]   = A2;
     TT[A2][IN_LTR]  = A2;
     TT[A2][IN_EXP]  = A2;
     TT[A2][IN_DIG]  = A2;
-    TT[A2][IN_UND]  = A3;              /* underscore found → now it's an ID */
-    TT[A2][IN_DELIM]= F_KW_CANDIDATE; /* delimiter → check keyword table */
+    TT[A2][IN_UND]  = A3;
+    TT[A2][IN_DELIM]= F_KW_CANDIDATE;
 
-    /* Path: letter-start + underscore seen */
     TT[A3][IN_LTR]  = A3;
     TT[A3][IN_EXP]  = A3;
     TT[A3][IN_DIG]  = A3;
@@ -192,16 +189,13 @@ void initTT(void)
     TT[B1][IN_DIG]  = B1;
     TT[B1][IN_DELIM]= F_NUM;
 
-    /* Leading sign — only valid if followed immediately by a digit */
     TT[B2][IN_DIG]  = B1;
 
-    /* Decimal / float */
     TT[B1][IN_DOT]  = B3;
     TT[B3][IN_DIG]  = B4;
     TT[B4][IN_DIG]  = B4;
     TT[B4][IN_DELIM]= F_NUM;
 
-    /* Exponent */
     TT[B1][IN_EXP]  = B5;
     TT[B4][IN_EXP]  = B5;
     TT[B5][IN_PLS]  = B6;
@@ -211,7 +205,29 @@ void initTT(void)
     TT[B7][IN_DELIM]= F_NUM;
 
     /* ---------------------------------------------------------
-       PUNCTUATION  (single-character, accept immediately)
+       STRING LITERALS   "..."
+    --------------------------------------------------------- */
+    TT[S][IN_QUOTE] = ST_STR;   /* opening " */
+
+    /* every input type is consumed inside a string */
+    int strInputs[] = {
+        IN_LTR, IN_DIG, IN_DOT, IN_EXP, IN_UND,
+        IN_LSB, IN_RSB, IN_LCB, IN_RCB, IN_LPR, IN_RPR,
+        IN_COL, IN_COM, IN_LT,  IN_GT,  IN_EQ,  IN_PLS,
+        IN_MNS, IN_MOD, IN_PIP, IN_AMP, IN_EXC, IN_MUL,
+        IN_DIV, IN_DELIM
+    };
+    int nStr = (int)(sizeof(strInputs) / sizeof(strInputs[0]));
+    for (int i = 0; i < nStr; i++) {
+        TT[ST_STR][strInputs[i]]     = ST_STR_ANY;
+        TT[ST_STR_ANY][strInputs[i]] = ST_STR_ANY;
+    }
+    /* closing " → accept */
+    TT[ST_STR][IN_QUOTE]     = F_STR;
+    TT[ST_STR_ANY][IN_QUOTE] = F_STR;
+
+    /* ---------------------------------------------------------
+       PUNCTUATION
     --------------------------------------------------------- */
     TT[S][IN_LSB]   = F_LSB;
     TT[S][IN_RSB]   = F_RSB;
@@ -225,59 +241,48 @@ void initTT(void)
     TT[S][IN_DIV]   = F_DIV;
 
     /* ---------------------------------------------------------
-       OPERATORS  (need one character of lookahead)
+       OPERATORS
     --------------------------------------------------------- */
-
-    /* < << <> <= */
     TT[S][IN_LT]        = OP_LT;
     TT[OP_LT][IN_LT]    = F_LTLT;
     TT[OP_LT][IN_GT]    = F_NEQ;
     TT[OP_LT][IN_EQ]    = F_LEQ;
     TT[OP_LT][IN_DELIM] = F_LT;
 
-    /* > >> >= */
     TT[S][IN_GT]        = OP_GT;
     TT[OP_GT][IN_GT]    = F_GTGT;
     TT[OP_GT][IN_EQ]    = F_GEQ;
     TT[OP_GT][IN_DELIM] = F_GT;
 
-    /* = == */
     TT[S][IN_EQ]        = OP_EQ;
     TT[OP_EQ][IN_EQ]    = F_EQ;
     TT[OP_EQ][IN_DELIM] = F_ASGN;
 
-    /* : := :: */
     TT[S][IN_COL]       = OP_COL;
     TT[OP_COL][IN_EQ]   = F_CEQ;
     TT[OP_COL][IN_COL]  = F_COL;
 
-    /* + ++ += */
     TT[S][IN_PLS]       = OP_PLS;
     TT[OP_PLS][IN_PLS]  = F_INC;
     TT[OP_PLS][IN_EQ]   = F_ADE;
     TT[OP_PLS][IN_DELIM]= F_ADD;
-    /* A plain '+' followed by a digit is a signed number */
-    TT[OP_PLS][IN_DIG]  = B1;   /* consume the digit, land in B1 */
+    TT[OP_PLS][IN_DIG]  = B1;
 
-    /* - -- -= or signed number */
     TT[S][IN_MNS]       = OP_MNS;
     TT[OP_MNS][IN_MNS]  = F_DEC;
     TT[OP_MNS][IN_EQ]   = F_SBE;
     TT[OP_MNS][IN_DELIM]= F_SUB;
-    TT[OP_MNS][IN_DIG]  = B1;   /* signed number */
+    TT[OP_MNS][IN_DIG]  = B1;
 
-    /* || */
     TT[S][IN_PIP]       = OP_PIP;
     TT[OP_PIP][IN_PIP]  = F_OR;
 
-    /* && */
     TT[S][IN_AMP]       = OP_AMP;
     TT[OP_AMP][IN_AMP]  = F_AND;
 
-    /* ! != */
     TT[S][IN_EXC]       = OP_EXC;
     TT[OP_EXC][IN_EQ]   = F_BNE;
-    TT[OP_EXC][IN_DELIM]= -1;   /* bare '!' is an error in this language */
+    TT[OP_EXC][IN_DELIM]= -1;
 }
 
 /* =========================================================
@@ -285,9 +290,7 @@ void initTT(void)
    ========================================================= */
 int charToInput(char c)
 {
-    /* E / e  — treated as a letter for identifiers, but also the exponent marker */
     if (c == 'E' || c == 'e') return IN_EXP;
-
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return IN_LTR;
     if ( c >= '0' && c <= '9')                             return IN_DIG;
 
@@ -311,8 +314,9 @@ int charToInput(char c)
         case '|':  return IN_PIP;
         case '&':  return IN_AMP;
         case '!':  return IN_EXC;
-        case '*':  return IN_MUL;   /* fixed: was IN_AMP */
+        case '*':  return IN_MUL;
         case '/':  return IN_DIV;
+        case '"':  return IN_QUOTE;
         case ' ':
         case '\t':
         case '\n':
@@ -329,16 +333,18 @@ bool isAccept(int state)
     return (state >= F_KW && state < STATE_COUNT);
 }
 
-/* Returns true if this input character should be consumed into the lexeme.
-   IN_DELIM is a lookahead-only delimiter — it triggers acceptance but is
-   NOT consumed into the lexeme (it will be skipped at the top of the outer loop). */
-bool advance(int inputCol)
+/* Returns true if this character should be consumed into the lexeme.
+   IN_DELIM is normally a lookahead-only delimiter — NOT consumed.
+   Exception: inside a string literal, spaces ARE consumed. */
+bool advance(int inputCol, int currentState)
 {
+    bool insideString = (currentState == ST_STR || currentState == ST_STR_ANY);
+    if (insideString && inputCol == IN_DELIM) return true;
     return (inputCol != IN_DELIM && inputCol >= 0);
 }
 
 /* =========================================================
-   Token class name (for readable output)
+   Token class name
    ========================================================= */
 const char *className(int state)
 {
@@ -346,6 +352,7 @@ const char *className(int state)
         case F_KW:   return "KEYWORD";
         case F_ID:   return "IDENTIFIER";
         case F_NUM:  return "NUMBER";
+        case F_STR:  return "STRING";
         case F_LT:   return "OP_LT";
         case F_LTLT: return "OP_LTLT";
         case F_NEQ:  return "OP_NEQ";
@@ -385,7 +392,6 @@ const char *className(int state)
    ========================================================= */
 bool isKeyword(const char *lexeme)
 {
-    /* Build a lowercase copy for comparison */
     char lower[256];
     int i = 0;
     while (lexeme[i] && i < 255) {
@@ -451,7 +457,7 @@ int main(int argc, char *argv[])
 
             int newState = TT[currentState][inputCol];
 
-            if (advance(inputCol)) {
+            if (advance(inputCol, currentState)) {
                 if (lexPtr < 255) lexeme[lexPtr++] = c;
                 ch = fgetc(sourceFile);
                 if (ch == EOF) {
@@ -468,22 +474,19 @@ int main(int argc, char *argv[])
             if (currentState == F_KW_CANDIDATE) {
                 if (isKeyword(lexeme)) {
                     currentState = F_KW;
-                    fprintf(tokenFile, "Token: %-20s | Class: %s\n",
-                            lexeme, className(currentState));
+                    fprintf(tokenFile, "<%s,KEYWORD>\n", lexeme);
                 } else {
                     fprintf(errorFile,
                             "Lexical Error: '%s' is not a keyword and has no underscore"
                             " (invalid identifier)\n", lexeme);
                 }
-
             } else {
-                fprintf(tokenFile, "Token: %-20s | Class: %s\n",
+                fprintf(tokenFile, "<%s,%s>\n",
                         lexeme, className(currentState));
             }
 
         } else {
             fprintf(errorFile, "Lexical Error: '%s' (dead state)\n", lexeme);
-            /* Recovery: if nothing was consumed, skip one character */
             if (lexPtr == 0) ch = fgetc(sourceFile);
         }
     }

@@ -1,14 +1,12 @@
 Adadi Marqazi ()
 {
-Adadi _num = 10 ::
-Ashriya num_ = -10.5E+12 ::
-Ashriya n_umber = +9.3 ::
-Harf cou_se = "c" ::
-Matn course_ = "Compiler Construction" ::
-Mantiqi _flag = True ::
-Agar ( _flag )
-output<- "Ok" ::
-Wagarna
-input-> _num ::
+Adadi count = 10 ::
+Ashriya _num = 10.5E ::
+Matn text_ = Hello ::
+Mantiqi flag = True ::
+
+Agar ( flag )
+output<- "Testing" ::
+
 Wapas 0 ::
 }
