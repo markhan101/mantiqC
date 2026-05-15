@@ -1,0 +1,18 @@
+Step | Act  | Stack                                                   | Input
+-----+------+---------------------------------------------------------+------------------------------------------
+1    | US   | $ Function                                              | Adadi ( ) { := :: } $                     Function -> Type id ( ArgList ) CompStmt
+2    | US   | $ CompStmt ) ArgList ( id Type                          | Adadi ( ) { := :: } $                     Type -> Adadi
+3    | MTCH | $ CompStmt ) ArgList ( id Adadi                         | Adadi ( ) { := :: } $                     match Adadi
+4    | POP  | $ CompStmt ) ArgList ( id                               | ( ) { := :: } $                           mismatch: expected id, pop stack
+5    | MTCH | $ CompStmt ) ArgList (                                  | ( ) { := :: } $                           match (
+6    | US   | $ CompStmt ) ArgList                                    | ) { := :: } $                             ArgList -> e
+7    | MTCH | $ CompStmt )                                            | ) { := :: } $                             match )
+8    | US   | $ CompStmt                                              | { := :: } $                               CompStmt -> { StmtList }
+9    | MTCH | $ } StmtList {                                          | { := :: } $                               match {
+10   | SCAN | $ } StmtList                                            | := :: } $                                 no rule (StmtList, :=); scan input
+11   | US   | $ } StmtList                                            | :: } $                                    StmtList -> Stmt StmtList
+12   | US   | $ } StmtList Stmt                                       | :: } $                                    Stmt -> ::
+13   | MTCH | $ } StmtList ::                                         | :: } $                                    match ::
+14   | US   | $ } StmtList                                            | } $                                       StmtList -> e
+15   | MTCH | $ }                                                     | } $                                       match }
+16   | MTCH | $                                                       | $                                         match $

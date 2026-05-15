@@ -1,0 +1,16 @@
+Function
+  Type
+    Adadi  [Adadi]
+  id
+  (  [(]
+  ArgList
+    e
+  )  [)]
+  CompStmt
+    {  [{]
+    StmtList
+      Stmt
+        ::  [::]
+      StmtList
+        e
+    }  [}]

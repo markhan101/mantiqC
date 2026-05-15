@@ -420,8 +420,8 @@ int main(int argc, char *argv[])
     }
 
     FILE *sourceFile = fopen(argv[1], "r");
-    FILE *tokenFile  = fopen("token.txt",  "w");
-    FILE *errorFile  = fopen("error.txt",  "w");
+    FILE *tokenFile  = fopen("Lexer/token.txt",  "w");
+    FILE *errorFile  = fopen("Lexer/error.txt",  "w");
 
     if (!sourceFile || !tokenFile || !errorFile) {
         fprintf(stderr, "Error opening files.\n");

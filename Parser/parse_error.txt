@@ -1,0 +1,2 @@
+Syntax error: expected 'id' on input '(' (lexeme "(") — popped terminal from stack
+Syntax error: unexpected ':=' (lexeme ":=") while parsing 'StmtList' — scanned input

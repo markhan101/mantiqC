@@ -1,0 +1,4 @@
+Lexical Error: 'identifier' is not a keyword and has no underscore (invalid identifier)
+Lexical Error: 'identifier' is not a keyword and has no underscore (invalid identifier)
+Lexical Error: 'number' is not a keyword and has no underscore (invalid identifier)
+Lexical Error: '$' (dead state)

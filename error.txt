@@ -1,6 +1,0 @@
-Lexical Error: 'count' is not a keyword and has no underscore (invalid identifier)
-Lexical Error: '10.5E' (dead state)
-Lexical Error: 'Hello' is not a keyword and has no underscore (invalid identifier)
-Lexical Error: 'flag' is not a keyword and has no underscore (invalid identifier)
-Lexical Error: 'flag' is not a keyword and has no underscore (invalid identifier)
-Lexical Error: 'output<' (dead state)
